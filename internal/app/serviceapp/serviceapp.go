@@ -3,11 +3,15 @@ package serviceapp
 import (
 	"context"
 	"fmt"
-	"github.com/streadway/amqp"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/kardianos/service"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/streadway/amqp"
 
 	"github.com/Vadimkatr/amqp_daemon/internal/app/amqpctl"
 	"github.com/Vadimkatr/amqp_daemon/internal/app/logger"
@@ -17,12 +21,25 @@ type CounterApp struct {
 	Logger service.Logger
 }
 
+var messageCounter = promauto.NewCounter(
+	prometheus.CounterOpts{
+		Name: "message_counter",
+		Help: "Total number of send messages.",
+	},
+)
+
 func (capp *CounterApp) Start(s service.Service) error {
 	capp.Logger.Infof("Start service app manager.\n")
 
+	go capp.runMonitoring()
 	go capp.runTask()
 
 	return nil
+}
+
+func (capp *CounterApp) runMonitoring() {
+	http.Handle("/metrics", promhttp.Handler())
+	http.ListenAndServe(":9001", nil)
 }
 
 func (capp *CounterApp) runTask() {
@@ -73,7 +90,7 @@ func (capp *CounterApp) runTask() {
 			q.Name,
 			false,
 			false,
-			amqp.Publishing {
+			amqp.Publishing{
 				DeliveryMode: amqp.Persistent,
 				ContentType:  "text/plain",
 				Body:         []byte(msg),
@@ -84,8 +101,9 @@ func (capp *CounterApp) runTask() {
 			return
 		}
 
+		messageCounter.Inc()
 		capp.Logger.Infof("send msg to: `%s`", msg)
-		counter ++
+		counter++
 	}
 }
 
