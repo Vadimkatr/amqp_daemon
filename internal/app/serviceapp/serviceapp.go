@@ -3,8 +3,11 @@ package serviceapp
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/kardianos/service"
@@ -38,8 +41,21 @@ func (capp *CounterApp) Start(s service.Service) error {
 }
 
 func (capp *CounterApp) runMonitoring() {
+	srv := &http.Server{Addr: ":2112"}
 	http.Handle("/metrics", promhttp.Handler())
-	http.ListenAndServe(":9001", nil)
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+	capp.Logger.Info("prometheus server started")
+
+	<-done
+	capp.Logger.Info("prometheus server stoped")
 }
 
 func (capp *CounterApp) runTask() {
