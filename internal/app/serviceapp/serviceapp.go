@@ -32,7 +32,7 @@ var messageCounter = promauto.NewCounter(
 )
 
 func (capp *CounterApp) Start(s service.Service) error {
-	capp.Logger.Infof("Start service app manager.\n")
+	capp.Logger.Infof("start service app manager.\n")
 
 	go capp.runMonitoring()
 	go capp.runTask()
