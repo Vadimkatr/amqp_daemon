@@ -10,7 +10,7 @@ type CustomLogger struct {
 }
 
 func (cl *CustomLogger) Init() {
-	cl.logger = log.New(os.Stdout, "",  log.Ldate|log.Ltime|log.Lshortfile)
+	cl.logger = log.New(os.Stdout, "",  log.Ldate|log.Ltime)
 }
 
 func (cl CustomLogger) Error(err error) {
@@ -31,6 +31,6 @@ func (cl CustomLogger) Warnf(format string, a ...interface{}) {
 }
 
 func (cl CustomLogger) With(prf string) Log {
-	cl.logger.SetPrefix(prf)
+	cl.logger.SetPrefix(prf + " ")
 	return cl
 }
