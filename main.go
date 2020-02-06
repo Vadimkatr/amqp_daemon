@@ -2,7 +2,12 @@ package main
 
 import (
 	"flag"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/kardianos/service"
 	"github.com/Vadimkatr/amqp_daemon/internal/app/serviceapp"
@@ -40,8 +45,28 @@ func main() {
 		return
 	}
 
+	go runMonitoring()
+
 	err = s.Run()
 	if err != nil {
 		log.Fatalf("fatal error while running serviceapp: %s", err)
 	}
+}
+
+func runMonitoring() {
+	srv := &http.Server{Addr: ":2112"}
+	http.Handle("/metrics", promhttp.Handler())
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Listen prometheus server error: %s\n", err)
+		}
+	}()
+	log.Printf("Prometheus server started")
+
+	<-done
+	log.Printf("Prometheus server stoped")
 }

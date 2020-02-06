@@ -3,17 +3,12 @@ package serviceapp
 import (
 	"context"
 	"fmt"
-	"log"
-	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/kardianos/service"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/streadway/amqp"
 
 	"github.com/Vadimkatr/amqp_daemon/internal/app/amqpctl"
@@ -34,28 +29,9 @@ var messageCounter = promauto.NewCounter(
 func (capp *CounterApp) Start(s service.Service) error {
 	capp.Logger.Infof("start service app manager.\n")
 
-	go capp.runMonitoring()
 	go capp.runTask()
 
 	return nil
-}
-
-func (capp *CounterApp) runMonitoring() {
-	srv := &http.Server{Addr: ":2112"}
-	http.Handle("/metrics", promhttp.Handler())
-
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %s\n", err)
-		}
-	}()
-	capp.Logger.Info("prometheus server started")
-
-	<-done
-	capp.Logger.Info("prometheus server stoped")
 }
 
 func (capp *CounterApp) runTask() {
