@@ -13,13 +13,20 @@ func (cl *CustomLogger) Init() {
 	cl.logger = log.New(os.Stdout, "",  log.Ldate|log.Ltime)
 }
 
-func (cl CustomLogger) Error(err error) {
-	cl.logger.Printf("ERROR: %s", err)
+func (cl CustomLogger) Error(err interface{}) {
+	cl.logger.Printf("ERROR: %v", err)
+}
+
+func (cl CustomLogger) Info(info interface{}) {
+	cl.logger.Printf("INFO: %v", info)
+}
+
+func (cl CustomLogger) Warn(warn interface{}) {
+	cl.logger.Printf("WARNING: %v", warn)
 }
 
 func (cl CustomLogger) Errorf(format string, a ...interface{}) {
 	cl.logger.Printf("ERROR: " + format, a)
-
 }
 
 func (cl CustomLogger) Infof(format string, a ...interface{}) {
