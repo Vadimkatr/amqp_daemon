@@ -10,20 +10,10 @@ services:
     environment:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       RABBITMQ_USED_QUEUE: service_test
-    networks:
-      - network
     ports:
       - "2112:2112"
     restart: unless-stopped
 
   rabbitmq:
     image: "rabbitmq"
-    networks:
-      - network
-    ports:
-      - "5672:5672"
-      - "15672:15672"
     restart: unless-stopped
-
-networks:
-  network:
