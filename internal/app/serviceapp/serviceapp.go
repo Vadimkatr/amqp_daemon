@@ -52,6 +52,7 @@ func (capp *CounterApp) runTask() {
 		capp.Logger.Errorf("error while creating amqpctl conn: %s", err)
 		return
 	}
+	defer conn.Close()
 
 	ch, err := conn.OpenChannel(context.Background())
 	if err != nil {
