@@ -38,6 +38,8 @@ func (cl CustomLogger) Warnf(format string, a ...interface{}) {
 }
 
 func (cl CustomLogger) With(prf string) Log {
-	cl.logger.SetPrefix(prf + " ")
-	return cl
+	newLogger := CustomLogger{}
+	newLogger.logger = log.New(cl.logger.Writer(), cl.logger.Prefix(), cl.logger.Flags())
+	newLogger.logger.SetPrefix(prf + " ")
+	return newLogger
 }
