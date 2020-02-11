@@ -1,72 +1,66 @@
 package main
 
 import (
-	"flag"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"log"
+	"context"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
-	"github.com/kardianos/service"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/Vadimkatr/amqp_daemon/internal/app/logger"
 	"github.com/Vadimkatr/amqp_daemon/internal/app/serviceapp"
 )
 
 func main() {
-	svcFlag := flag.String("serviceapp", "", "Control the system serviceapp.")
-	flag.Parse()
+	lg := logger.CustomLogger{}
+	lg.Init()
 
-	svcConfig := &service.Config{
-		Name:        "rabbitmq_counter_queue",
-		DisplayName: "Go Service Example for RabbitMQ",
-		Description: "This is an example Go service serviceapp that sends 1s to rabbitmq queue.",
-	}
+	done := make(chan os.Signal)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	capp := &serviceapp.CounterApp{}
-	s, err := service.New(capp, svcConfig)
-	if err != nil {
-		log.Fatalf("fatal error while creating serviceapp: %s", err)
-	}
+	ctx, cancel := context.WithCancel(context.Background())
 
-	serviceLogger, err := s.Logger(nil)
-	if err != nil {
-		log.Fatalf("fatal error while creating serviceapp logger: %s", err)
-	}
-	capp.Logger = serviceLogger
+	go func() {
+		oscall := <-done
+		lg.Infof("system call: %v", oscall)
+		cancel()
+	}()
 
-	if len(*svcFlag) != 0 {
-		err := service.Control(s, *svcFlag)
-		if err != nil {
-			log.Printf("Valid actions: %q\n", service.ControlAction)
-			log.Fatalf("fatal error while control servic action: %s", err)
-		}
-		log.Printf("Lets start!\n")
-		return
-	}
-
-	go runMonitoring()
-
-	err = s.Run()
-	if err != nil {
-		log.Fatalf("fatal error while running serviceapp: %s", err)
-	}
-}
-
-func runMonitoring() {
+	// start prometheus server
 	srv := &http.Server{Addr: ":2112"}
 	http.Handle("/metrics", promhttp.Handler())
 
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Listen prometheus server error: %s\n", err)
+		lg.Info("Prometheus server started")
+		if err := srv.ListenAndServe(); err != nil {
+			lg.Errorf("Listen prometheus server: %v", err)
 		}
 	}()
-	log.Printf("Prometheus server started")
 
-	<-done
-	log.Printf("Prometheus server stoped")
+	// start daemon task
+	service := serviceapp.ServiceApp{
+		Logger: lg,
+	}
+	service.Start(ctx)
+
+	<-ctx.Done()
+
+	// graceful shutdown
+	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer func() {
+		cancel()
+	}()
+
+	// stop daemon task
+	service.Stop(ctxShutDown)
+
+	// stop prometheus server
+	if err := srv.Shutdown(ctxShutDown); err != nil {
+		lg.Errorf("Prometheus server shutdown failed: %s", err)
+		return
+	}
+	lg.Info("Prometheus server stopped")
 }
