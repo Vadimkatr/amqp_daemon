@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/Vadimkatr/amqp_daemon/internal/app/logger"
+	"github.com/Vadimkatr/amqp_daemon/internal/app/serviceapp"
 )
 
 func main() {
@@ -33,28 +34,33 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	go func() {
+		lg.Info("Prometheus server started")
 		if err := srv.ListenAndServe(); err != nil {
 			lg.Errorf("Listen prometheus server: %v", err)
 		}
 	}()
-	lg.Info("Prometheus server started")
 
 	// start daemon task
-	// ...
+	service := serviceapp.ServiceApp{
+		Logger: lg,
+	}
+	service.Start(ctx)
+
+	<-ctx.Done()
 
 	// graceful shutdown
-	<-ctx.Done()
-	lg.Info("Prometheus server stoped")
-
 	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		cancel()
 	}()
 
+	// stop daemon task
+	service.Stop(ctxShutDown)
+
+	// stop prometheus server
 	if err := srv.Shutdown(ctxShutDown); err != nil {
 		lg.Errorf("Prometheus server shutdown failed: %s", err)
 		return
 	}
-
-	lg.Info("Prometheus server exited properly")
+	lg.Info("Prometheus server stopped")
 }
