@@ -41,12 +41,23 @@ func main() {
 	}()
 
 	// start daemon task
+	serviceErr := make(chan error)
 	service := serviceapp.ServiceApp{
 		Logger: lg,
+		Err:    serviceErr,
 	}
 	service.Start(ctx)
 
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+		{
+
+		}
+	case err := <- service.Err:
+		{
+			lg.Infof("have service error: %s; stopping...", err)
+		}
+	}
 
 	// graceful shutdown
 	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)

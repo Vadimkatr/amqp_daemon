@@ -2,6 +2,7 @@ package serviceapp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/streadway/amqp"
 	"os"
@@ -23,6 +24,7 @@ var messageCounter = promauto.NewCounter(
 
 type ServiceApp struct {
 	Logger logger.Log
+	Err chan error
 }
 
 func (s *ServiceApp) Start(ctx context.Context) {
@@ -43,14 +45,14 @@ func (s *ServiceApp) run(ctx context.Context) {
 	}
 	conn, err := amqpctl.NewConnectionController(s.Logger, cfg)
 	if err != nil {
-		s.Logger.Errorf("error while creating amqpctl conn: %s", err)
+		s.Err <- errors.New(fmt.Sprintf("error while creating amqpctl conn: %s", err))
 		return
 	}
 	defer conn.Close()
 
 	ch, err := conn.OpenChannel(ctx)
 	if err != nil {
-		s.Logger.Errorf("error while opening channel: %s", err)
+		s.Err <- errors.New(fmt.Sprintf("error while opening channel: %s", err))
 		return
 	}
 	defer ch.Close()
@@ -64,7 +66,7 @@ func (s *ServiceApp) run(ctx context.Context) {
 		nil,
 	)
 	if err != nil {
-		s.Logger.Errorf("error while queue declare: %s", err)
+		s.Err <- errors.New(fmt.Sprintf("error while queue declare: %s", err))
 		return
 	}
 
@@ -95,7 +97,7 @@ func (s *ServiceApp) run(ctx context.Context) {
 			},
 		)
 		if err != nil {
-			s.Logger.Errorf("error while publishing msg: %s", err)
+			s.Err <- errors.New(fmt.Sprintf("error while publishing msg: %s", err))
 			return
 		}
 
