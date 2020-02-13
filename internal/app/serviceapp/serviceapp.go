@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/streadway/amqp"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,15 +25,21 @@ var messageCounter = promauto.NewCounter(
 
 type ServiceApp struct {
 	Logger logger.Log
-	Err chan error
+	Err    chan error
+	wg     sync.WaitGroup
 }
 
 func (s *ServiceApp) Start(ctx context.Context) {
 	s.Logger.Info("service is started")
+
+	s.wg = sync.WaitGroup{}
+	s.wg.Add(1)
 	go s.run(ctx)
+
 }
 
 func (s *ServiceApp) run(ctx context.Context) {
+	defer s.wg.Done()
 	cfg := amqpctl.Config{
 		DSN:                  os.Getenv("RABBITMQ_URL"), // by default is "amqp://guest:guest@localhost:5672/"
 		ReconnectionInterval: time.Duration(time.Minute * 10),
@@ -107,8 +114,8 @@ func (s *ServiceApp) run(ctx context.Context) {
 	}
 }
 
-func (s *ServiceApp) Stop(ctx context.Context) {
+func (s *ServiceApp) Stop() {
 	// context with timeout, to complete service task
-	<-ctx.Done()
+	s.wg.Wait()
 	s.Logger.Info("service is stopped.")
 }

@@ -66,7 +66,7 @@ func main() {
 	}()
 
 	// stop daemon task
-	service.Stop(ctxShutDown)
+	service.Stop()
 
 	// stop prometheus server
 	if err := srv.Shutdown(ctxShutDown); err != nil {
