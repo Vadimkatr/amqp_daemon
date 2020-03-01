@@ -81,13 +81,9 @@ func (s *ServiceApp) run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			{
-				s.Logger.Info("service start graceful shutdown")
-				return
-			}
+			s.Logger.Info("service start graceful shutdown")
+			return
 		default:
-			{
-			}
 		}
 
 		time.Sleep(1 * time.Second)

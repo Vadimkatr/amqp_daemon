@@ -49,14 +49,9 @@ func main() {
 	service.Start(ctx)
 
 	select {
+	case err := <-service.Err:
+		lg.Infof("have service error: %s; stopping...", err)
 	case <-ctx.Done():
-		{
-
-		}
-	case err := <- service.Err:
-		{
-			lg.Infof("have service error: %s; stopping...", err)
-		}
 	}
 
 	// graceful shutdown
