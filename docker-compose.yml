@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - rabbitmq
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      RABBITMQ_USED_QUEUE: service_test
+    ports:
+      - "2112:2112"
+    restart: unless-stopped
+
+  rabbitmq:
+    image: "rabbitmq"
+    restart: unless-stopped
