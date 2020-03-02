@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/streadway/amqp"
-	"os"
 	"sync"
 	"time"
 
@@ -23,7 +22,16 @@ var messageCounter = promauto.NewCounter(
 	},
 )
 
+type ServiceConfig struct {
+	DNS                  string
+	ReconnectionInterval time.Duration
+	ReconnectionRetries  int
+
+	UsedQueueName string
+}
+
 type ServiceApp struct {
+	Cfg    ServiceConfig
 	Logger logger.Log
 	Err    chan error
 	wg     sync.WaitGroup
@@ -41,9 +49,9 @@ func (s *ServiceApp) Start(ctx context.Context) {
 func (s *ServiceApp) run(ctx context.Context) {
 	defer s.wg.Done()
 	cfg := amqpctl.Config{
-		DSN:                  os.Getenv("RABBITMQ_URL"), // by default is "amqp://guest:guest@localhost:5672/"
-		ReconnectionInterval: time.Duration(time.Minute * 10),
-		ReconnectionRetries:  1,
+		DSN:                  s.Cfg.DNS,
+		ReconnectionInterval: time.Minute * s.Cfg.ReconnectionInterval,
+		ReconnectionRetries:  s.Cfg.ReconnectionRetries,
 		CaPath:               "",
 		CertPath:             "",
 		KeyPath:              "",
@@ -65,7 +73,7 @@ func (s *ServiceApp) run(ctx context.Context) {
 	defer ch.Close()
 
 	q, err := ch.QueueDeclare(
-		os.Getenv("RABBITMQ_USED_QUEUE"),
+		s.Cfg.UsedQueueName,
 		false,
 		false,
 		false,

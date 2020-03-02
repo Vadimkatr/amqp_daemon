@@ -14,6 +14,11 @@ import (
 	"github.com/Vadimkatr/amqp_daemon/internal/app/serviceapp"
 )
 
+const (
+	ReconnectionIntervalDefault = 10
+	ReconnectionRetriesDefault  = 1
+)
+
 func main() {
 	lg := logger.CustomLogger{}
 	lg.Init()
@@ -42,7 +47,14 @@ func main() {
 
 	// start daemon task
 	serviceErr := make(chan error)
+	serviceCfg := serviceapp.ServiceConfig{
+		DNS:                  os.Getenv("RABBITMQ_URL"), // by default is "amqp://guest:guest@localhost:5672/"
+		ReconnectionInterval: ReconnectionIntervalDefault,
+		ReconnectionRetries:  ReconnectionRetriesDefault,
+		UsedQueueName:        os.Getenv("RABBITMQ_USED_QUEUE"),
+	}
 	service := serviceapp.ServiceApp{
+		Cfg:    serviceCfg,
 		Logger: lg,
 		Err:    serviceErr,
 	}
