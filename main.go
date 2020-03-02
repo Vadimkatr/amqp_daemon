@@ -36,10 +36,12 @@ func main() {
 
 	// start prometheus server
 	srv := &http.Server{Addr: ":2112"}
+
 	http.Handle("/metrics", promhttp.Handler())
 
 	go func() {
 		lg.Info("Prometheus server started")
+
 		if err := srv.ListenAndServe(); err != nil {
 			lg.Errorf("Listen prometheus server: %v", err)
 		}
@@ -68,9 +70,7 @@ func main() {
 
 	// graceful shutdown
 	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer func() {
-		cancel()
-	}()
+	defer cancel()
 
 	// stop daemon task
 	service.Stop()
@@ -80,5 +80,6 @@ func main() {
 		lg.Errorf("Prometheus server shutdown failed: %s", err)
 		return
 	}
+
 	lg.Info("Prometheus server stopped")
 }

@@ -41,5 +41,6 @@ func (cl CustomLogger) With(prf string) Log {
 	newLogger := CustomLogger{}
 	newLogger.logger = log.New(cl.logger.Writer(), cl.logger.Prefix(), cl.logger.Flags())
 	newLogger.logger.SetPrefix(prf + " ")
+
 	return newLogger
 }

@@ -2,14 +2,13 @@ package serviceapp
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/streadway/amqp"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/streadway/amqp"
 
 	"github.com/Vadimkatr/amqp_daemon/internal/app/amqpctl"
 	"github.com/Vadimkatr/amqp_daemon/internal/app/logger"
@@ -39,15 +38,15 @@ type ServiceApp struct {
 
 func (s *ServiceApp) Start(ctx context.Context) {
 	s.Logger.Info("service is started")
-
 	s.wg = sync.WaitGroup{}
 	s.wg.Add(1)
-	go s.run(ctx)
 
+	go s.run(ctx)
 }
 
 func (s *ServiceApp) run(ctx context.Context) {
 	defer s.wg.Done()
+
 	cfg := amqpctl.Config{
 		DSN:                  s.Cfg.DNS,
 		ReconnectionInterval: time.Minute * s.Cfg.ReconnectionInterval,
@@ -59,15 +58,16 @@ func (s *ServiceApp) run(ctx context.Context) {
 		ServerName:           "",
 	}
 	conn, err := amqpctl.NewConnectionController(s.Logger, cfg)
+
 	if err != nil {
-		s.Err <- errors.New(fmt.Sprintf("error while creating amqpctl conn: %s", err))
+		s.Err <- fmt.Errorf("error while creating amqpctl conn: %s", err)
 		return
 	}
 	defer conn.Close()
 
 	ch, err := conn.OpenChannel(ctx)
 	if err != nil {
-		s.Err <- errors.New(fmt.Sprintf("error while opening channel: %s", err))
+		s.Err <- fmt.Errorf("error while opening channel: %s", err)
 		return
 	}
 	defer ch.Close()
@@ -81,12 +81,15 @@ func (s *ServiceApp) run(ctx context.Context) {
 		nil,
 	)
 	if err != nil {
-		s.Err <- errors.New(fmt.Sprintf("error while queue declare: %s", err))
+		s.Err <- fmt.Errorf("error while queue declare: %s", err)
 		return
 	}
 
 	counter := 0
+
 	for {
+		time.Sleep(1 * time.Second)
+
 		select {
 		case <-ctx.Done():
 			s.Logger.Info("service start graceful shutdown")
@@ -94,7 +97,6 @@ func (s *ServiceApp) run(ctx context.Context) {
 		default:
 		}
 
-		time.Sleep(1 * time.Second)
 		msg := fmt.Sprintf("%d", counter)
 		err = ch.Publish(
 			"",
@@ -107,8 +109,9 @@ func (s *ServiceApp) run(ctx context.Context) {
 				Body:         []byte(msg),
 			},
 		)
+
 		if err != nil {
-			s.Err <- errors.New(fmt.Sprintf("error while publishing msg: %s", err))
+			s.Err <- fmt.Errorf("error while publishing msg: %s", err)
 			return
 		}
 
@@ -119,7 +122,6 @@ func (s *ServiceApp) run(ctx context.Context) {
 }
 
 func (s *ServiceApp) Stop() {
-	// context with timeout, to complete service task
 	s.wg.Wait()
 	s.Logger.Info("service is stopped.")
 }
