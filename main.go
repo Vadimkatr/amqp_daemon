@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	ReconnectionIntervalDefault = 10
-	ReconnectionRetriesDefault  = 1
+	ReconnectionIntervalDefault = 5  // every _ seconds
+	ReconnectionRetriesDefault  = 10 // _ attempts
 )
 
 func main() {

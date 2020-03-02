@@ -49,7 +49,7 @@ func (s *ServiceApp) run(ctx context.Context) {
 
 	cfg := amqpctl.Config{
 		DSN:                  s.Cfg.DNS,
-		ReconnectionInterval: time.Minute * s.Cfg.ReconnectionInterval,
+		ReconnectionInterval: time.Second * s.Cfg.ReconnectionInterval,
 		ReconnectionRetries:  s.Cfg.ReconnectionRetries,
 		CaPath:               "",
 		CertPath:             "",
@@ -65,11 +65,34 @@ func (s *ServiceApp) run(ctx context.Context) {
 	}
 	defer conn.Close()
 
-	ch, err := conn.OpenChannel(ctx)
-	if err != nil {
-		s.Err <- fmt.Errorf("error while opening channel: %s", err)
-		return
+	for {
+		ch, err := conn.OpenChannel(ctx)
+
+		if err != nil {
+			if ctx.Err() != nil {
+				s.Err <- fmt.Errorf("error while opening channel: %s", err)
+				return
+			}
+
+			s.Logger.Errorf("failed to open channel: %s. Try again...", err)
+
+			continue
+		}
+
+		// do things (sending msg "1" to queue using channel ch)
+		err = s.doWork(ctx, ch)
+		if err != nil {
+			s.Logger.Errorf("failed while publishing msg: %s", err)
+			continue
+		}
+
+		if ctx.Err() != nil {
+			return
+		}
 	}
+}
+
+func (s *ServiceApp) doWork(ctx context.Context, ch *amqp.Channel) error {
 	defer ch.Close()
 
 	q, err := ch.QueueDeclare(
@@ -81,8 +104,7 @@ func (s *ServiceApp) run(ctx context.Context) {
 		nil,
 	)
 	if err != nil {
-		s.Err <- fmt.Errorf("error while queue declare: %s", err)
-		return
+		return fmt.Errorf("error while queue declare: %s", err)
 	}
 
 	counter := 0
@@ -93,7 +115,7 @@ func (s *ServiceApp) run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			s.Logger.Info("service start graceful shutdown")
-			return
+			return nil
 		default:
 		}
 
@@ -111,8 +133,7 @@ func (s *ServiceApp) run(ctx context.Context) {
 		)
 
 		if err != nil {
-			s.Err <- fmt.Errorf("error while publishing msg: %s", err)
-			return
+			return fmt.Errorf("error while publishing msg: %s", err)
 		}
 
 		messageCounter.Inc()
